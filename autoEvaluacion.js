@@ -15,33 +15,61 @@ const rl = readline.createInterface({
 });
 
 const pregunta = (texto) => {
-  return new Promise((resolve) => {
-    rl.question(texto, (respuesta) => resolve(respuesta));
+  return new Promise((resolve, reject) => {
+    rl.question(texto, (respuesta) => {
+      if (!respuesta) {
+        reject(new Error("La respuesta no puede estar vacía"));
+      }
+      resolve(respuesta);
+    });
   });
 };
 
-const main = async () => {
+const obtenerDatosProducto = async () => {
   try {
     const nombre = await pregunta("Producto: ");
     const precio = parseFloat(await pregunta("Precio: "));
     const cantidad = parseInt(await pregunta("Cantidad: "), 10);
 
-    const producto = { nombre, precio, cantidad };
-    let productos = [];
-
-    try {
-      const data = await fs.readFile(argv.file, "utf-8");
-      productos = JSON.parse(data);
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
+    if (isNaN(precio) || isNaN(cantidad)) {
+      throw new Error("El precio o la cantidad no son válidos");
     }
+
+    return { nombre, precio, cantidad };
+  } catch (error) {
+    throw new Error(`Error al obtener datos del producto: ${error.message}`);
+  }
+};
+
+const leerArchivo = async (file) => {
+  try {
+    const data = await fs.readFile(file, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return [];
+    }
+    throw new Error(`Error al leer el archivo: ${error.message}`);
+  }
+};
+
+const escribirArchivo = async (file, data) => {
+  try {
+    await fs.writeFile(file, JSON.stringify(data, null, 2));
+    console.log(`Producto guardado en ${file}`);
+  } catch (error) {
+    throw new Error(`Error al escribir en el archivo: ${error.message}`);
+  }
+};
+
+const main = async () => {
+  try {
+    const producto = await obtenerDatosProducto();
+    let productos = await leerArchivo(argv.file);
 
     productos.push(producto);
 
-    await fs.writeFile(argv.file, JSON.stringify(productos, null, 2));
-    console.log(`Producto guardado en ${argv.file}`);
+    await escribirArchivo(argv.file, productos);
 
     const contenidoFinal = await fs.readFile(argv.file, "utf-8");
     console.log("Contenido actual del archivo:", contenidoFinal);
